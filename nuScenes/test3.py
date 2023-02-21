@@ -1,31 +1,26 @@
 import open3d as o3d
 
-# 创建 visualizer 对象
+# 加载点云
+pcd = o3d.io.read_point_cloud("cloud.pcd")
+
+# 创建visualizer
 vis = o3d.visualization.Visualizer()
 vis.create_window()
 
-# 加载点云数据
-pcd = o3d.io.read_point_cloud("pointcloud.pcd")
+# 设置视角并添加点云
+ctr = vis.get_view_control()
+vis.add_geometry(pcd)
+ctr.rotate(30.0, 20.0)
 
-# 加载 view_trajectory.json
-view_trajectory = o3d.io.read_view_trajectory("view_trajectory.json")
+# 保存视角
+trajectory = o3d.camera.PinholeCameraTrajectory()
+intrinsic = ctr.convert_to_pinhole_camera_parameters().intrinsic
+extrinsic = ctr.convert_to_pinhole_camera_parameters().extrinsic
+trajectory.parameters.append(o3d.camera.PinholeCameraParameters(intrinsic, extrinsic))
+o3d.io.write_pinhole_camera_trajectory("view.json", trajectory)
 
-# 将相机位姿转换为相机矩阵
-camera_intrinsics = vis.get_render_option().intrinsics
-camera_poses = []
-for view in view_trajectory.views:
-    camera_pose = view.camera_pose
-    intrinsic = view.intrinsic
-    intrinsic.set_intrinsics(camera_intrinsics.width, camera_intrinsics.height, intrinsic.intrinsic_matrix[0, 0], intrinsic.intrinsic_matrix[1, 1], camera_intrinsics.width / 2, camera_intrinsics.height / 2)
-    camera_poses.append(camera_pose)
-camera_matrices = o3d.camera.PinholeCameraTrajectory.convert_pinhole_camera_intrinsics_to_matrix(camera_intrinsics, camera_poses)
-
-# 设置视角
-vis.get_view_control().convert_from_pinhole_camera_parameters(camera_matrices[0])
+# 加载视角并应用
+loaded_trajectory = o3d.io.read_pinhole_camera_trajectory("view.json")
+ctr.convert_from_pinhole_camera_parameters(loaded_trajectory.parameters[0])
+vis.poll_events()
 vis.update_renderer()
-
-# 保存当前视角
-vis.capture_screen_image("image.png")
-
-# 关闭窗口
-vis.destroy_window()
